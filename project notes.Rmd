@@ -1,0 +1,284 @@
+---
+title: "Project notes"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+#notes:
+
+-probably will have to clean the dataset in the summary statistics section rather than the joining section so that i can use all dplyr functions to clean the dataset
+
+-need to na.omit() the zipcode_imr dataset so that NAs are already gone
+
+
+
+--------------------------------------------------------------------------------
+
+
+#impporting datasets: #done
+```{r}
+library(tidyverse)
+zipcode_dem <- read_csv("zipcode_dem.csv")
+zipcode_imr <- read_csv("zipcode_imr.csv")
+
+
+zipcode_dem <- zipcode_dem
+zipcode_imr <- zipcode_imr
+
+
+#this makes the first row not column names (only need it for zipcodes_dem)
+library(readr)
+zipcode_dem <- read_csv("project1/zipcode_dem.csv", 
+    col_names = FALSE)
+View(zipcode_dem)
+
+library(readr)
+zipcode_income <- read_csv("project1/zipcode_income.csv", 
+    col_names = FALSE)
+View(zipcode_income)
+```
+
+
+#tidying: #done
+```{r}
+#zipcode_IMR dataset is already tidied
+
+#tidying zipcode_dem:
+zipcode_dem_3 <- zipcode_dem_2 %>% pivot_longer(cols = c('X2':'X265'))
+
+zipcode_dem_3 <- zipcode_dem_3 %>% pivot_wider(names_from = "X1", values_from = "value")
+
+zipcode_dem_3 <- zipcode_dem_3 %>% select(-name)
+
+zipcode_dem_3 <- zipcode_dem_3 %>% separate(Label, into = c(NA, "zip_code"), sep = 6)
+
+zipcode_dem_3 <- zipcode_dem_3 %>% filter(!str_detect(zip_code, "Margin"), !str_detect(zip_code, "Percent"))
+
+zipcode_dem_3 <- zipcode_dem_3 %>% separate(zip_code, into = c("zip_code", NA), sep = 5)
+
+zipcode_dem_3 <- zipcode_dem_3 %>% select(zip_code, total_population = "Total population", median_age = "Median age (years)", hispanic_latino_any_race = "Hispanic or Latino (of any race)", white_alone = "White alone", black_alone = "Black or African American alone", native_american_alone = "American Indian and Alaska Native alone", asian_alone = "Asian alone")
+
+zipcode_dem_4 <- as.data.frame(apply(zipcode_dem_3, 2, as.numeric)) #made dataset numeric
+
+#need to make zip_code into character
+zipcode_joined$zip_code <- as.character(zipcode_joined$zip_code)
+
+--------------------------------------------------------------------------------
+
+#tidying zipcode_income: (zipcode household median income estimate)
+zipcode_income_3 <- zipcode_income_2 %>% pivot_longer(cols = c('X2':'X537'))
+
+zipcode_income_3 <- zipcode_income_3 %>% pivot_wider(names_from = "X1", values_from = "value")
+
+zipcode_income_3 <- zipcode_income_3 %>% select(-name, -Total, -"Mean income (dollars)")
+
+zipcode_income_3 <- zipcode_income_3 %>% filter(!str_detect(Label, "Texas"), !str_detect(Label, "Margin"), !str_detect(Label, "Families"), !str_detect(Label, "families"), !str_detect(Label, "Nonfamily"))
+
+zipcode_income_3 <- zipcode_income_3 %>% separate(Label, into = c(NA, "zip_code"), sep = 6)
+zipcode_income_3 <- zipcode_income_3 %>% separate(zip_code, into = c("zip_code", NA), sep = 5)
+
+zipcode_income_3 <- zipcode_income_3 %>% select(zip_code, median_income = "Median income (dollars)")
+
+zipcode_income_3[ , "median_income"] <- as.data.frame(
+  apply(zipcode_income_3[ , "median_income"], 2, as.numeric)) #made median_income into numeric
+
+```
+
+
+#joins:
+You will document the type of join that you do (left/right/inner/full), including a discussion of how many observations/rows and distinct IDs were in each original dataset, which IDs appeared in one dataset but not the other, how many observations in each dataset were dropped (if any) after doing the join, and why you chose this particular join. 
+```{r}
+#An inner_join() will be used. The "zipcode_dem" dataset has 66 observations/rows. The "zipcode_imr" dataset has 2,455 observations/rows. Distinct IDs... ?. All IDs in the "zipcode_dem" dataset appeared in the "zipcode_imr" dataset. 2,389 IDs, or zip codes, appeared in the "zipcode_imr" dataset that didn't appear in the "zipcode_dem" dataset. 0 observations were dropped from "zipcode_dem" and 2,389 observations were dropped from "zipcode_imr". The reason I chose an inner_join is because the "zipcode_dem dataset", which contains the demographic data, only had 66 observations. Since the "zipcode_imr" dataset contains every Texas zip code, but not demographic data, the only data I could use to analyzed would be the zip codes that only appear in both, and not the extra zip codes in the "zipcodes_imr" dataset that don't appear in "zipcodes_dem".
+
+#need to write about "zipcode_income" now
+
+
+glimpse(zipcode_dem_4)
+glimpse(zipcode_imr)
+
+zipcode_dem_4 %>% inner_join(zipcode_imr, by = c("zip_code" = "Zip"))
+zipcode_joined %>% inner_join(zipcode_income_3, by = "zip_code")
+
+zipcode_joined <- zipcode_dem_4 %>% inner_join(zipcode_imr, by = c("zip_code" = "Zip"))
+zipcode_joined <- zipcode_joined %>% inner_join(zipcode_income_3, by = "zip_code") #remember to make zip_code character with: zipcode_joined$zip_code <- as.character(zipcode_joined$zip_code)
+
+anti_join(zipcode_dem_4, zipcode_imr, by = c("zip_code" = "Zip"))
+anti_join(zipcode_imr, zipcode_dem_4, by = c("Zip" = "zip_code"))
+```
+
+
+#summary statistics:
+    
+    - Use *all six* core `dplyr` functions (`filter, select, arrange, group_by, mutate, summarize`) to manipulate and explore your dataset. For mutate, create a  new variable that is a function of at least one other variable, preferably using a dplyr vector function (see dplyr cheatsheet). It's totally fine to use the `_if`, `_at`, `_all` versions of mutate/summarize instead (indeed, it is encouraged if you have lots of variables). Use a `stringr` function such as str_detect or str_replace_all with regex at least once.
+```{r}
+
+#used select to order columns differently:
+zipcode_joined <- zipcode_joined %>% select(zip_code, total_population, median_age, median_income, income_class, IMR, hispanic_latino_any_race, white_alone, black_alone, native_american_alone, asian_alone)
+
+
+#used mutate to create categorical variable:
+zipcode_joined <- zipcode_joined %>% mutate(income_class = case_when(median_income < 35000 ~ "lower class",
+                                                   median_income >= 35000 & 50000 > median_income ~ "lower middle class",
+                                                   median_income >= 50000 & 110000 >= median_income ~ "middle class",
+                                                   median_income > 110000 ~ "upper middle class"))
+
+
+#used mutate to create new variable that is function of another:
+zipcode_joined <- zipcode_joined %>% mutate(proportion_hispanic = hispanic_latino_any_race/total_population,
+                          proportion_white = white_alone/total_population,
+                          proportion_black = black_alone/total_population,
+                          proportion_native = native_american_alone/total_population,
+                          proportion_asian = asian_alone/total_population)
+
+
+#used summarized and group_by to get average IMR by class:
+zipcode_joined %>% group_by(income_class) %>% summarize(mean(IMR, na.rm = T))
+
+
+#arrange:
+zipcode_joined %>% arrange(desc(IMR))
+
+
+#used str_detect and filter in the tidying section
+
+
+```
+
+
+    - Using `dplyr`, create summary statistics (`mean, sd, var, n, quantile, min, max, n_distinct, cor`, etc) for each of your numeric variables. If you have lots of numeric variables (e.g., 10+), pick a few that are of interest and just summarize based on those. For your categorical variables, report the frequencies/counts of each level. Finally, report the number of missing values (NAs) for each variable.
+```{r}
+zipcode_joined %>% summarize(mean_pop = mean(total_population, na.rm = T), sd_pop = sd(total_population), var_pop = var(total_population), min_pop = min(total_population), max_pop = max(total_population), distinct_pop = n_distinct(total_population), median_pop = median(total_population))
+
+
+zipcode_joined %>% summarize(mean_inc = mean(median_income, na.rm = T), sd_inc = sd(median_income), var_inc = var(median_income), min_inc = min(median_income), max_inc = max(median_income), distinct_inc = n_distinct(median_income), median_ = median(median_income)) #use this one 
+
+
+zipcode_joined %>% summarize(mean_IMR = mean(IMR, na.rm = T), sd_IMR = sd(IMR, na.rm = T), var_IMR = var(IMR, na.rm = T), min_IMR = min(IMR, na.rm = T), max_IMR = max(IMR, na.rm = T), distinct_IMR = n_distinct(IMR), median_IMR = median(IMR, na.rm = T)) #use this one 
+
+
+zipcode_joined %>% summarize(mean_hisp = mean(proportion_hispanic, na.rm = T), sd_hisp = sd(proportion_hispanic), var_hisp = var(proportion_hispanic), min_hisp = min(proportion_hispanic), max_hisp = max(proportion_hispanic), distinct_hisp = n_distinct(proportion_hispanic), median_hisp = median(proportion_hispanic)) #use this one
+
+
+zipcode_joined %>% summarize(mean_white = mean(proportion_white, na.rm = T), sd_white = sd(proportion_white), var_white = var(proportion_white), min_white = min(proportion_white), max_white = max(proportion_white), distinct_white = n_distinct(proportion_white), median_white = median(proportion_white)) #use this one
+
+
+zipcode_joined %>% summarize(mean_black = mean(proportion_black, na.rm = T), sd_black = sd(proportion_black), var_black = var(proportion_black), min_black = min(proportion_black), max_black = max(proportion_black), distinct_black = n_distinct(proportion_black), median_black = median(proportion_black)) #use this one
+
+
+zipcode_joined %>% summarize(mean_native = mean(proportion_native, na.rm = T), sd_native = sd(proportion_native), var_native = var(proportion_native), min_native = min(proportion_native), max_native = max(proportion_native), distinct_native = n_distinct(proportion_native), median_native = median(proportion_native)) #use this one
+
+zipcode_joined %>% summarize(mean_asian = mean(proportion_asian, na.rm = T), sd_asian = sd(proportion_asian), var_asian = var(proportion_asian), min_asian = min(proportion_asian), max_asian = max(proportion_asian), distinct_asian = n_distinct(proportion_asian), median_asian = median(proportion_asian)) #use this one 
+
+zipcode_joined %>% count(income_class)
+
+#the only variable with NAs is the IMR variable
+
+zipcode_joined %>% select(IMR) %>% summarize(numberofNAs = n(IMR) - n(zipcode_joined %>% na.omit()))
+
+
+zipcode_joined %>% summarize(count = n())
+zipcode_joined %>% na.omit() %>% summarize("count without NAs" = n())
+66 - 58
+#there are 8 NAs in IMR
+```
+
+
+
+    - Compute these statistics both overall and after grouping by one or more categorical variables (either together or one-at-a-time; if you have two categorical variables, include at least one statistic based on a grouping of two categorical variables simultaneously). If you do not have any categorical variables, create one using mutate (e.g., with `case_when` or `ifelse`) to satisfy the `group_by` requirements above. Compute at least one summary stat with a user-defined function rather than a built-in one.
+```{r}
+#need to make a user-defined function
+
+
+
+#finding stats when grouping by income_class:
+zipcode_joined %>% group_by(income_class) %>% summarize(mean_pop = mean(total_population, na.rm = T), sd_pop = sd(total_population), var_pop = var(total_population), min_pop = min(total_population), max_pop = max(total_population), distinct_pop = n_distinct(total_population), median_pop = median(total_population)) %>% knitr::kable()
+
+
+zipcode_joined %>% group_by(income_class) %>% summarize(mean_inc = mean(median_income, na.rm = T), sd_inc = sd(median_income), var_inc = var(median_income), min_inc = min(median_income), max_inc = max(median_income), distinct_inc = n_distinct(median_income), median_ = median(median_income)) %>% knitr::kable()
+
+
+zipcode_joined %>% group_by(income_class) %>% summarize(mean_IMR = mean(IMR, na.rm = T), sd_IMR = sd(IMR, na.rm = T), var_IMR = var(IMR, na.rm = T), min_IMR = min(IMR, na.rm = T), max_IMR = max(IMR, na.rm = T), distinct_IMR = n_distinct(IMR), median_IMR = median(IMR, na.rm = T)) %>% knitr::kable()
+
+
+zipcode_joined %>% group_by(income_class) %>% summarize(mean_hisp = mean(proportion_hispanic, na.rm = T), sd_hisp = sd(proportion_hispanic), var_hisp = var(proportion_hispanic), min_hisp = min(proportion_hispanic), max_hisp = max(proportion_hispanic), distinct_hisp = n_distinct(proportion_hispanic), median_hisp = median(proportion_hispanic)) %>% knitr::kable()
+
+
+zipcode_joined %>% group_by(income_class) %>% summarize(mean_white = mean(proportion_white, na.rm = T), sd_white = sd(proportion_white), var_white = var(proportion_white), min_white = min(proportion_white), max_white = max(proportion_white), distinct_white = n_distinct(proportion_white), median_white = median(proportion_white)) %>% knitr::kable()
+
+
+zipcode_joined %>% group_by(income_class) %>% summarize(mean_black = mean(proportion_black, na.rm = T), sd_black = sd(proportion_black), var_black = var(proportion_black), min_black = min(proportion_black), max_black = max(proportion_black), distinct_black = n_distinct(proportion_black), median_black = median(proportion_black)) %>% knitr::kable()
+
+
+zipcode_joined %>% group_by(income_class) %>% summarize(mean_native = mean(proportion_native, na.rm = T), sd_native = sd(proportion_native), var_native = var(proportion_native), min_native = min(proportion_native), max_native = max(proportion_native), distinct_native = n_distinct(proportion_native), median_native = median(proportion_native)) %>% knitr::kable()
+
+
+zipcode_joined %>% group_by(income_class) %>% summarize(mean_asian = mean(proportion_asian, na.rm = T), sd_asian = sd(proportion_asian), var_asian = var(proportion_asian), min_asian = min(proportion_asian), max_asian = max(proportion_asian), distinct_asian = n_distinct(proportion_asian), median_asian = median(proportion_asian)) %>% knitr::kable()
+
+
+```
+ 
+
+    - Report these summary statistics in an easy-to-read tables (e.g., by reshaping, if your original datasets were tidy). Style at least one table using the `gt` or `kable` packages. 
+```{r}
+
+```
+
+
+#visualizations
+
+    - Create at least three plots of your choice with ggplot that highlight some of the more interesting features of your data.
+    - Each plot should have at least two geom layers and at least two variables mapped to aesthetics
+    - Each should make use of different geoms (don't make the same kind of plot twice)
+    - At least one plot should correctly make use of `stat="summary"` 
+    - Each plot should include both a theme and scale modification
+    - Each should include a supporting paragraph describing the relationships being visualized and any trends that are apparent
+    - It is fine to include more, but limit yourself to 4. Plots should avoid being redundant! 
+    - Make them pretty! Customize them! 
+```{r}
+library(ggplot2)
+
+#geom_bars:
+zipcode_joined %>% na.omit() %>% group_by(income_class) %>% summarize(mean_imr = mean(IMR, na.rm = T)) %>%
+  ggplot(aes(income_class, mean_imr)) + 
+  geom_bar(stat = "identity")
+
+zipcode_joined %>% group_by(income_class) %>% summarize(average_black = mean(proportion_black)) %>%
+  ggplot(aes(x = income_class, y = average_black)) + 
+  geom_bar(stat = "identity")
+
+zipcode_joined %>% na.omit() %>% group_by(income_class) %>% summarize(mean_imr = mean(IMR, na.rm = T)) %>%
+  ggplot(aes(x = income_class, y = mean_imr)) + 
+  geom_bar(stat = "summary", fun=mean) +
+  geom_errorbar(stat="summary")
+
+
+#geom_points:
+zipcode_joined %>% na.omit() %>%
+  ggplot(aes(x = proportion_black, y = IMR)) +
+  geom_point(aes(color = income_class)) +
+  geom_smooth(method="lm")
+
+zipcode_joined %>% na.omit() %>%
+  ggplot(aes(x = proportion_white, y = IMR)) +
+  geom_point() +
+  geom_smooth(method="lm")
+
+
+#geom_:
+zipcode_joined %>% 
+  ggplot(aes(x = IMR)) +
+  geom_density()
+
+zipcode_joined %>% 
+  ggplot(aes(x = IMR)) +
+  geom_histogram()
+
+```
+
+
+
+
+
+
